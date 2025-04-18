@@ -163,8 +163,9 @@ public class Dictionary {
 
         while (idx < word.length()) {
             for (TrieNode child : curr.children) {
-                if (child.character.equals(String.valueOf(word.charAt(idx)))) {
-                    idx++;
+                if (child.character.length() <= word.length() - idx && child.character
+                        .equals(String.valueOf(word.substring(idx, idx + child.character.length())))) {
+                    idx += child.character.length();
                     curr = child;
                     currFound = true;
                     break;
@@ -210,9 +211,10 @@ public class Dictionary {
                 sequence = sequence + '-';
             }
             for (TrieNode child : curr.children) {
-                if (child.character.equals(String.valueOf(word.charAt(idx)))) {
-                    sequence = sequence + word.charAt(idx);
-                    idx++;
+                if (child.character.length() <= word.length() - idx && child.character
+                        .equals(String.valueOf(word.substring(idx, idx + child.character.length())))) {
+                    sequence = sequence + child.character;
+                    idx += child.character.length();
                     curr = child;
                     currFound = true;
                     break;
@@ -244,8 +246,9 @@ public class Dictionary {
 
         while (idx < prefix.length()) {
             for (TrieNode child : curr.children) {
-                if (child.character.equals(String.valueOf(prefix.charAt(idx)))) {
-                    idx++;
+                if (child.character.length() <= prefix.length() - idx && child.character
+                        .equals(String.valueOf(prefix.substring(idx, idx + child.character.length())))) {
+                    idx += child.character.length();
                     curr = child;
                     currFound = true;
                     break;
@@ -264,8 +267,14 @@ public class Dictionary {
     private int countHelper(TrieNode node) {
         int count = 0;
 
-        for (TrieNode child : node.children) {
-            count += 1 + countHelper(child);
+        while (node.children.size() == 1) {
+            node = node.children.get(0);
+        }
+
+        if (node.children != null) {
+            for (TrieNode child : node.children) {
+                count += 1 + countHelper(child);
+            }
         }
 
         return count;
