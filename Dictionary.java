@@ -279,6 +279,32 @@ public class Dictionary {
         /*
          * Traverse the Trie, combining nodes/branches when there is just one child
          */
+        root = compressor(root);
+    }
 
+    private TrieNode compressor(TrieNode node) {
+        String characters = node.character;
+        TrieNode curr = node;
+
+        // loop while single child and add to characters
+        while (curr.children.size() <= 1 && !curr.character.equals("$")) {
+            curr = curr.children.get(0);
+            characters = characters + curr.character;
+        }
+
+        // create new TrieNode with character = characters
+        TrieNode compressedNode = new TrieNode(characters);
+
+        if (curr.character.equals("$")) {
+            compressedNode.children = curr.children;
+        } else {
+            // compressedNode.children = compressor(child)
+            for (TrieNode child : curr.children) {
+                compressedNode.children.add(compressor(child));
+            }
+        }
+
+        // return the compressed node
+        return compressedNode;
     }
 }
