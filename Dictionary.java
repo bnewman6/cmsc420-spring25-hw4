@@ -1,13 +1,30 @@
 import java.lang.String;
+import java.util.ArrayList;
+
+class TrieNode {
+    public String character;
+    public ArrayList<TrieNode> children;
+
+    public TrieNode(String character) {
+        this.character = character;
+        this.children = null;
+    }
+}
 
 /**
  * Dictionary class that stores words and associates them with their definitions
  */
 public class Dictionary {
+    private TrieNode root;
+
     /**
      * Constructor to initialize the Dictionary
      */
     public Dictionary() {
+        /*
+         * create a base Trie
+         */
+        root = new TrieNode(null);
     }
 
     /**
@@ -19,7 +36,56 @@ public class Dictionary {
      * @param definition The definition we want to associate with the word
      */
     public void add(String word, String definition) {
-        // TODO
+        /*
+         * Traverse the Trie until the characters aren't present, then add a new chain
+         * of the remaining characters
+         */
+        int idx = 0;
+        TrieNode curr = root;
+        boolean endFound = false;
+        boolean currFound = false;
+
+        while (idx < word.length()) {
+            for (TrieNode child : curr.children) {
+                if (child.character.equals(String.valueOf(word.charAt(idx)))) {
+                    idx++;
+                    curr = child;
+                    currFound = true;
+                    break;
+                }
+            }
+            if (currFound) {
+                currFound = false;
+            } else {
+                break;
+            }
+        }
+
+        if (idx == word.length()) {
+            for (TrieNode child : curr.children) {
+                if (child.character.equals("$")) {
+                    child.children.get(0).character = definition;
+                    endFound = true;
+                }
+            }
+        }
+        if (!endFound) {
+            curr.children.add(addNewNode(word.concat(" ").substring(idx), definition));
+        }
+    }
+
+    private TrieNode addNewNode(String word, String definition) {
+        if (word.equals(" ")) {
+            TrieNode defNode = new TrieNode(definition);
+            TrieNode emptyNode = new TrieNode("$");
+            emptyNode.children.add(defNode);
+            return emptyNode;
+        }
+
+        TrieNode curr = new TrieNode(String.valueOf(word.charAt(0)));
+        curr.children.add(addNewNode(word.substring(1), definition));
+
+        return curr;
     }
 
     /**
@@ -28,7 +94,55 @@ public class Dictionary {
      * @param word The word we want to remove from our dictionary
      */
     public void remove(String word) {
-        // TODO
+        /*
+         * traverse the trie down the word until there are no children
+         */
+        removeHelper(root, word);
+    }
+
+    private boolean removeHelper(TrieNode base, String word) {
+        TrieNode curr = base;
+        TrieNode goodChild = null;
+        TrieNode badChild = null;
+
+        for (TrieNode child : curr.children) {
+            if (child.character.equals(String.valueOf(word.charAt(0)))) {
+                goodChild = child;
+                break;
+            }
+        }
+
+        if (goodChild == null) {
+            return false;
+        }
+
+        if (word.length() == 1) {
+            for (TrieNode child : goodChild.children) {
+                if (child.character.equals("$")) {
+                    badChild = child;
+                    break;
+                }
+            }
+            if (badChild == null) {
+                return false;
+            }
+            goodChild.children.remove(badChild);
+            if (goodChild.children.size() > 0) {
+                return false;
+            } else {
+                curr.children.remove(goodChild);
+                return true;
+            }
+        } else if (removeHelper(goodChild, word.substring(1))) {
+            if (goodChild.children.size() > 0) {
+                return false;
+            } else {
+                curr.children.remove(goodChild);
+                return true;
+            }
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -39,6 +153,36 @@ public class Dictionary {
      * @return The definition of the word, or null if not found
      */
     public String getDefinition(String word) {
+        /*
+         * traverse the trie down the word. Once done, there must be a child '$' that
+         * points to the definition
+         */
+        int idx = 0;
+        TrieNode curr = root;
+        boolean currFound = false;
+
+        while (idx < word.length()) {
+            for (TrieNode child : curr.children) {
+                if (child.character.equals(String.valueOf(word.charAt(idx)))) {
+                    idx++;
+                    curr = child;
+                    currFound = true;
+                    break;
+                }
+            }
+            if (currFound) {
+                currFound = false;
+            } else {
+                return null;
+            }
+        }
+
+        for (TrieNode child : curr.children) {
+            if (child.character.equals("$")) {
+                return child.children.get(0).character;
+            }
+        }
+
         return null;
     }
 
@@ -52,7 +196,36 @@ public class Dictionary {
      * @return The sequence representation, or null if word not found
      */
     public String getSequence(String word) {
-        return null;
+        /*
+         * traverse the trie, adding the characters to a string. When there is more than
+         * one child, add "-"
+         */
+        String sequence = "";
+        int idx = 0;
+        TrieNode curr = root;
+        boolean currFound = false;
+
+        while (idx < word.length()) {
+            if (curr.children.size() > 1) {
+                sequence = sequence + '-';
+            }
+            for (TrieNode child : curr.children) {
+                if (child.character.equals(String.valueOf(word.charAt(idx)))) {
+                    sequence = sequence + word.charAt(idx);
+                    idx++;
+                    curr = child;
+                    currFound = true;
+                    break;
+                }
+            }
+            if (currFound) {
+                currFound = false;
+            } else {
+                return null;
+            }
+        }
+
+        return sequence;
     }
 
     /**
@@ -62,7 +235,40 @@ public class Dictionary {
      * @return The number of words that start with the prefix
      */
     public int countPrefix(String prefix) {
-        return 0;
+        /*
+         * traverses down the prefix then counts all children from that point on
+         */
+        int idx = 0;
+        TrieNode curr = root;
+        boolean currFound = false;
+
+        while (idx < prefix.length()) {
+            for (TrieNode child : curr.children) {
+                if (child.character.equals(String.valueOf(prefix.charAt(idx)))) {
+                    idx++;
+                    curr = child;
+                    currFound = true;
+                    break;
+                }
+            }
+            if (currFound) {
+                currFound = false;
+            } else {
+                return 0;
+            }
+        }
+
+        return countHelper(curr);
+    }
+
+    private int countHelper(TrieNode node) {
+        int count = 0;
+
+        for (TrieNode child : node.children) {
+            count += 1 + countHelper(child);
+        }
+
+        return count;
     }
 
     /**
@@ -70,6 +276,9 @@ public class Dictionary {
      * This operation should not change the behavior of any other methods
      */
     public void compress() {
-        // TODO
+        /*
+         * Traverse the Trie, combining nodes/branches when there is just one child
+         */
+
     }
 }
