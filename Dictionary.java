@@ -7,7 +7,7 @@ class TrieNode {
 
     public TrieNode(String character) {
         this.character = character;
-        this.children = null;
+        this.children = new ArrayList<>();
     }
 }
 
@@ -24,7 +24,7 @@ public class Dictionary {
         /*
          * create a base Trie
          */
-        root = new TrieNode(null);
+        root = new TrieNode("");
     }
 
     /**
@@ -100,8 +100,7 @@ public class Dictionary {
         removeHelper(root, word);
     }
 
-    private boolean removeHelper(TrieNode base, String word) {
-        TrieNode curr = base;
+    private boolean removeHelper(TrieNode curr, String word) {
         TrieNode goodChild = null;
         TrieNode badChild = null;
 
@@ -163,7 +162,13 @@ public class Dictionary {
 
         while (idx < word.length()) {
             for (TrieNode child : curr.children) {
-                if (child.character.length() <= word.length() - idx && child.character
+                if (child.character.charAt(child.character.length() - 1) == '$') {
+                    if (child.character.length() - 1 == word.length() - idx
+                            && child.character.substring(0, child.character.length() - 1)
+                                    .equals(String.valueOf(word.substring(idx, idx + child.character.length() - 1)))) {
+                        return child.children.get(0).character;
+                    }
+                } else if (child.character.length() <= word.length() - idx && child.character
                         .equals(String.valueOf(word.substring(idx, idx + child.character.length())))) {
                     idx += child.character.length();
                     curr = child;
@@ -207,11 +212,18 @@ public class Dictionary {
         boolean currFound = false;
 
         while (idx < word.length()) {
-            if (curr.children.size() > 1) {
+            if (curr.children.size() > 1 && curr.character.length() > 0) {
                 sequence = sequence + '-';
             }
             for (TrieNode child : curr.children) {
-                if (child.character.length() <= word.length() - idx && child.character
+                if (child.character.charAt(child.character.length() - 1) == '$') {
+                    if (child.character.length() - 1 == word.length() - idx
+                            && child.character.substring(0, child.character.length() - 1)
+                                    .equals(String.valueOf(word.substring(idx, idx + child.character.length() - 1)))) {
+                        sequence = sequence + child.character.substring(0, child.character.length() - 1);
+                        return sequence;
+                    }
+                } else if (child.character.length() <= word.length() - idx && child.character
                         .equals(String.valueOf(word.substring(idx, idx + child.character.length())))) {
                     sequence = sequence + child.character;
                     idx += child.character.length();
@@ -246,9 +258,17 @@ public class Dictionary {
 
         while (idx < prefix.length()) {
             for (TrieNode child : curr.children) {
-                if (child.character.length() <= prefix.length() - idx && child.character
-                        .equals(String.valueOf(prefix.substring(idx, idx + child.character.length())))) {
-                    idx += child.character.length();
+                if (child.character.length() <= prefix.length() - idx) {
+                    if (child.character
+                            .equals(String.valueOf(prefix.substring(idx, idx + child.character.length())))) {
+                        idx += child.character.length();
+                        curr = child;
+                        currFound = true;
+                        break;
+                    }
+                } else if (child.character.substring(0, prefix.length() - idx)
+                        .equals(String.valueOf(prefix.substring(idx)))) {
+                    idx = prefix.length();
                     curr = child;
                     currFound = true;
                     break;
@@ -265,15 +285,16 @@ public class Dictionary {
     }
 
     private int countHelper(TrieNode node) {
-        int count = 0;
+        int count = 1;
 
         while (node.children.size() == 1) {
             node = node.children.get(0);
         }
 
-        if (node.children != null) {
+        if (node.children.size() > 1) {
+            count = 0;
             for (TrieNode child : node.children) {
-                count += 1 + countHelper(child);
+                count += countHelper(child);
             }
         }
 
@@ -288,7 +309,11 @@ public class Dictionary {
         /*
          * Traverse the Trie, combining nodes/branches when there is just one child
          */
-        root = compressor(root);
+        TrieNode newRoot = new TrieNode("");
+        for (TrieNode child : root.children) {
+            newRoot.children.add(compressor(child));
+        }
+        root = newRoot;
     }
 
     private TrieNode compressor(TrieNode node) {
@@ -296,7 +321,7 @@ public class Dictionary {
         TrieNode curr = node;
 
         // loop while single child and add to characters
-        while (curr.children.size() <= 1 && !curr.character.equals("$")) {
+        while (curr.children.size() == 1 && !curr.character.equals("$")) {
             curr = curr.children.get(0);
             characters = characters + curr.character;
         }
