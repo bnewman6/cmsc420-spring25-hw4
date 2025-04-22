@@ -2,12 +2,16 @@ import java.lang.String;
 import java.util.ArrayList;
 
 class TrieNode {
-    public String character;
+    public String label;
     public ArrayList<TrieNode> children;
+    public boolean isWordEnd;
+    public String definition;
 
-    public TrieNode(String character) {
-        this.character = character;
+    public TrieNode(String label) {
+        this.label = label;
         this.children = new ArrayList<>();
+        this.isWordEnd = false;
+        this.definition = null;
     }
 }
 
@@ -16,6 +20,7 @@ class TrieNode {
  */
 public class Dictionary {
     private TrieNode root;
+    private boolean isCompressed;
 
     /**
      * Constructor to initialize the Dictionary
@@ -25,6 +30,7 @@ public class Dictionary {
          * create a base Trie
          */
         root = new TrieNode("");
+        isCompressed = false;
     }
 
     /**
@@ -40,52 +46,56 @@ public class Dictionary {
          * Traverse the Trie until the characters aren't present, then add a new chain
          * of the remaining characters
          */
-        int idx = 0;
+        if (isCompressed)
+            return;
+
         TrieNode curr = root;
-        boolean endFound = false;
-        boolean currFound = false;
+        int idx = 0;
 
         while (idx < word.length()) {
+            boolean found = false;
             for (TrieNode child : curr.children) {
-                if (child.character.equals(String.valueOf(word.charAt(idx)))) {
-                    idx++;
+                String label = child.label;
+                int len = Math.min(label.length(), word.length() - idx);
+
+                int match = 0;
+                while (match < len && label.charAt(match) == word.charAt(idx + match)) {
+                    match++;
+                }
+
+                if (match > 0) {
+                    if (match < label.length()) {
+                        // Split the child
+                        TrieNode split = new TrieNode(label.substring(match));
+                        split.children = child.children;
+                        split.isWordEnd = child.isWordEnd;
+                        split.definition = child.definition;
+
+                        child.label = label.substring(0, match);
+                        child.children = new ArrayList<>();
+                        child.children.add(split);
+                        child.isWordEnd = false;
+                        child.definition = null;
+                    }
+
                     curr = child;
-                    currFound = true;
+                    idx += match;
+                    found = true;
                     break;
                 }
             }
-            if (currFound) {
-                currFound = false;
-            } else {
-                break;
+
+            if (!found) {
+                TrieNode newNode = new TrieNode(word.substring(idx));
+                newNode.isWordEnd = true;
+                newNode.definition = definition;
+                curr.children.add(newNode);
+                return;
             }
         }
 
-        if (idx == word.length()) {
-            for (TrieNode child : curr.children) {
-                if (child.character.equals("$")) {
-                    child.children.get(0).character = definition;
-                    endFound = true;
-                }
-            }
-        }
-        if (!endFound) {
-            curr.children.add(addNewNode(word.concat(" ").substring(idx), definition));
-        }
-    }
-
-    private TrieNode addNewNode(String word, String definition) {
-        if (word.equals(" ")) {
-            TrieNode defNode = new TrieNode(definition);
-            TrieNode emptyNode = new TrieNode("$");
-            emptyNode.children.add(defNode);
-            return emptyNode;
-        }
-
-        TrieNode curr = new TrieNode(String.valueOf(word.charAt(0)));
-        curr.children.add(addNewNode(word.substring(1), definition));
-
-        return curr;
+        curr.isWordEnd = true;
+        curr.definition = definition;
     }
 
     /**
@@ -97,51 +107,34 @@ public class Dictionary {
         /*
          * traverse the trie down the word until there are no children
          */
-        removeHelper(root, word);
+        if (isCompressed)
+            return;
+        removeHelper(root, word, 0);
     }
 
-    private boolean removeHelper(TrieNode curr, String word) {
-        TrieNode goodChild = null;
-        TrieNode badChild = null;
-
-        for (TrieNode child : curr.children) {
-            if (child.character.equals(String.valueOf(word.charAt(0)))) {
-                goodChild = child;
-                break;
-            }
+    private boolean removeHelper(TrieNode node, String word, int idx) {
+        if (idx == word.length()) {
+            if (!node.isWordEnd)
+                return false;
+            node.isWordEnd = false;
+            node.definition = null;
+            return node.children.isEmpty();
         }
 
-        if (goodChild == null) {
-            return false;
-        }
-
-        if (word.length() == 1) {
-            for (TrieNode child : goodChild.children) {
-                if (child.character.equals("$")) {
-                    badChild = child;
-                    break;
+        for (int i = 0; i < node.children.size(); i++) {
+            TrieNode child = node.children.get(i);
+            String label = child.label;
+            if (word.startsWith(label, idx)) {
+                boolean shouldRemove = removeHelper(child, word, idx + label.length());
+                if (shouldRemove) {
+                    node.children.remove(i);
+                    return !node.isWordEnd && node.children.isEmpty();
                 }
-            }
-            if (badChild == null) {
                 return false;
             }
-            goodChild.children.remove(badChild);
-            if (goodChild.children.size() > 0) {
-                return false;
-            } else {
-                curr.children.remove(goodChild);
-                return true;
-            }
-        } else if (removeHelper(goodChild, word.substring(1))) {
-            if (goodChild.children.size() > 0) {
-                return false;
-            } else {
-                curr.children.remove(goodChild);
-                return true;
-            }
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /**
@@ -156,40 +149,25 @@ public class Dictionary {
          * traverse the trie down the word. Once done, there must be a child '$' that
          * points to the definition
          */
-        int idx = 0;
         TrieNode curr = root;
-        boolean currFound = false;
+        int idx = 0;
 
         while (idx < word.length()) {
+            boolean found = false;
             for (TrieNode child : curr.children) {
-                if (child.character.charAt(child.character.length() - 1) == '$') {
-                    if (child.character.length() - 1 == word.length() - idx
-                            && child.character.substring(0, child.character.length() - 1)
-                                    .equals(String.valueOf(word.substring(idx, idx + child.character.length() - 1)))) {
-                        return child.children.get(0).character;
-                    }
-                } else if (child.character.length() <= word.length() - idx && child.character
-                        .equals(String.valueOf(word.substring(idx, idx + child.character.length())))) {
-                    idx += child.character.length();
+                String label = child.label;
+                if (word.startsWith(label, idx)) {
+                    idx += label.length();
                     curr = child;
-                    currFound = true;
+                    found = true;
                     break;
                 }
             }
-            if (currFound) {
-                currFound = false;
-            } else {
+            if (!found)
                 return null;
-            }
         }
 
-        for (TrieNode child : curr.children) {
-            if (child.character.equals("$")) {
-                return child.children.get(0).character;
-            }
-        }
-
-        return null;
+        return curr.isWordEnd ? curr.definition : null;
     }
 
     /**
@@ -206,40 +184,31 @@ public class Dictionary {
          * traverse the trie, adding the characters to a string. When there is more than
          * one child, add "-"
          */
-        String sequence = "";
-        int idx = 0;
+        if (!isCompressed)
+            return null;
         TrieNode curr = root;
-        boolean currFound = false;
+        int idx = 0;
+        StringBuilder sb = new StringBuilder();
 
         while (idx < word.length()) {
-            if (curr.children.size() > 1 && curr.character.length() > 0) {
-                sequence = sequence + '-';
-            }
+            boolean found = false;
             for (TrieNode child : curr.children) {
-                if (child.character.charAt(child.character.length() - 1) == '$') {
-                    if (child.character.length() - 1 == word.length() - idx
-                            && child.character.substring(0, child.character.length() - 1)
-                                    .equals(String.valueOf(word.substring(idx, idx + child.character.length() - 1)))) {
-                        sequence = sequence + child.character.substring(0, child.character.length() - 1);
-                        return sequence;
-                    }
-                } else if (child.character.length() <= word.length() - idx && child.character
-                        .equals(String.valueOf(word.substring(idx, idx + child.character.length())))) {
-                    sequence = sequence + child.character;
-                    idx += child.character.length();
+                String label = child.label;
+                if (word.startsWith(label, idx)) {
+                    if (sb.length() > 0)
+                        sb.append("-");
+                    sb.append(label);
+                    idx += label.length();
                     curr = child;
-                    currFound = true;
+                    found = true;
                     break;
                 }
             }
-            if (currFound) {
-                currFound = false;
-            } else {
+            if (!found)
                 return null;
-            }
         }
 
-        return sequence;
+        return curr.isWordEnd ? sb.toString() : null;
     }
 
     /**
@@ -252,52 +221,33 @@ public class Dictionary {
         /*
          * traverses down the prefix then counts all children from that point on
          */
-        int idx = 0;
         TrieNode curr = root;
-        boolean currFound = false;
+        int idx = 0;
 
         while (idx < prefix.length()) {
+            boolean found = false;
             for (TrieNode child : curr.children) {
-                if (child.character.length() <= prefix.length() - idx) {
-                    if (child.character
-                            .equals(String.valueOf(prefix.substring(idx, idx + child.character.length())))) {
-                        idx += child.character.length();
-                        curr = child;
-                        currFound = true;
-                        break;
-                    }
-                } else if (child.character.substring(0, prefix.length() - idx)
-                        .equals(String.valueOf(prefix.substring(idx)))) {
-                    idx = prefix.length();
+                String label = child.label;
+                int len = Math.min(label.length(), prefix.length() - idx);
+                if (prefix.substring(idx, idx + len).equals(label.substring(0, len))) {
+                    idx += len;
                     curr = child;
-                    currFound = true;
+                    found = true;
                     break;
                 }
             }
-            if (currFound) {
-                currFound = false;
-            } else {
+            if (!found)
                 return 0;
-            }
         }
 
-        return countHelper(curr);
+        return countWords(curr);
     }
 
-    private int countHelper(TrieNode node) {
-        int count = 1;
-
-        while (node.children.size() == 1) {
-            node = node.children.get(0);
+    private int countWords(TrieNode node) {
+        int count = node.isWordEnd ? 1 : 0;
+        for (TrieNode child : node.children) {
+            count += countWords(child);
         }
-
-        if (node.children.size() > 1) {
-            count = 0;
-            for (TrieNode child : node.children) {
-                count += countHelper(child);
-            }
-        }
-
         return count;
     }
 
@@ -309,36 +259,23 @@ public class Dictionary {
         /*
          * Traverse the Trie, combining nodes/branches when there is just one child
          */
-        TrieNode newRoot = new TrieNode("");
-        for (TrieNode child : root.children) {
-            newRoot.children.add(compressor(child));
+        isCompressed = true;
+        for (int i = 0; i < root.children.size(); i++) {
+            root.children.set(i, compressNode(root.children.get(i)));
         }
-        root = newRoot;
     }
 
-    private TrieNode compressor(TrieNode node) {
-        String characters = node.character;
-        TrieNode curr = node;
-
-        // loop while single child and add to characters
-        while (curr.children.size() == 1 && !curr.character.equals("$")) {
-            curr = curr.children.get(0);
-            characters = characters + curr.character;
+    private TrieNode compressNode(TrieNode node) {
+        while (node.children.size() == 1 && !node.isWordEnd) {
+            TrieNode child = node.children.get(0);
+            node.label += child.label;
+            node.isWordEnd = child.isWordEnd;
+            node.definition = child.definition;
+            node.children = child.children;
         }
-
-        // create new TrieNode with character = characters
-        TrieNode compressedNode = new TrieNode(characters);
-
-        if (curr.character.equals("$")) {
-            compressedNode.children = curr.children;
-        } else {
-            // compressedNode.children = compressor(child)
-            for (TrieNode child : curr.children) {
-                compressedNode.children.add(compressor(child));
-            }
+        for (int i = 0; i < node.children.size(); i++) {
+            node.children.set(i, compressNode(node.children.get(i)));
         }
-
-        // return the compressed node
-        return compressedNode;
+        return node;
     }
 }
